@@ -1,2 +1,6 @@
 Datasets/
 testing.ipynb
+MaltParser/
+maltParserOut.conll
+conllu-to-conll-standard.py
+corpus.conll

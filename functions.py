@@ -4,9 +4,13 @@ import stanza
 import re
 import itertools
 import numpy as np
+import spacy
+from stanza.utils.conll import CoNLL
+#/home/ivan/Desktop/Uni/TFG/RepositorioTFG/Datasets/IULA/IULA_Spanish_LSP_Treebank.conll
 
 class Dataset(pd.DataFrame):
-    nlp_stanza = stanza.Pipeline(lang='es', processors='tokenize,ner,mwt,pos,lemma')
+    nlp_stanza = stanza.Pipeline(lang='es', processors='tokenize,ner,mwt,pos,lemma,depparse')
+    nlp_spacy = spacy.load("es_core_news_md")
     uposTags = ("ADJ","ADP", "ADV", "AUX", "CCONJ", "DET", "INTJ", "ADJ", "NOUN", "NUM", "PART", "PRON", "PROPN", "PUNCT", "SCONJ", "SYM", "VERB", "X")
     def __init__(self, source : pd.DataFrame):
         """Main object that generates the dataset from a pandas DataFrame object consisting of two columns. The first column should be named 'text' and contain the raw texts. The second column should be named 'label' and contain the label 'human' if the text is human generated or anything else if it's AI generated.
@@ -65,10 +69,11 @@ class Dataset(pd.DataFrame):
     #TODO: syntactic structure Features, legibility features, pragmatic/discourse features, Other features
 
     def debug(self):
-        for i in self.docs:
-            for sent in i.sentences:
-                for w in sent.words:
-                    print(f"{w.text} : {w.upos} or {w.xpos}")
+        for i in self.sentences:
+            for j in i:
+                for token in self.nlp_spacy(j.text):
+                    print(token.text, token.dep_)
+                print(*[f'id: {word.id}\tword: {word.text}\thead id: {word.head}\thead: {j.words[word.head-1].text if word.head > 0 else "root"}\tdeprel: {word.deprel}' for word in j.words], sep='\n')
 
 
 def bigramMatrix(l : list, keys: list):
@@ -96,5 +101,4 @@ def initMatrixAsDict(keys):
     return out
 
 if __name__ == "__main__":
-    a = Dataset(pd.read_excel("/home/ivan/Desktop/Uni/TFG/RepositorioTFG/Datasets/out.xlsx"))
-    print(a)
+    print("Hola")
