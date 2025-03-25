@@ -4,13 +4,10 @@ import stanza
 import re
 import itertools
 import numpy as np
-import spacy
 from stanza.utils.conll import CoNLL
-#/home/ivan/Desktop/Uni/TFG/RepositorioTFG/Datasets/IULA/IULA_Spanish_LSP_Treebank.conll
 
 class Dataset(pd.DataFrame):
     nlp_stanza = stanza.Pipeline(lang='es', processors='tokenize,ner,mwt,pos,lemma,depparse')
-    nlp_spacy = spacy.load("es_core_news_md")
     uposTags = ("ADJ","ADP", "ADV", "AUX", "CCONJ", "DET", "INTJ", "ADJ", "NOUN", "NUM", "PART", "PRON", "PROPN", "PUNCT", "SCONJ", "SYM", "VERB", "X")
     def __init__(self, source : pd.DataFrame):
         """Main object that generates the dataset from a pandas DataFrame object consisting of two columns. The first column should be named 'text' and contain the raw texts. The second column should be named 'label' and contain the label 'human' if the text is human generated or anything else if it's AI generated.
@@ -32,6 +29,8 @@ class Dataset(pd.DataFrame):
         self.__setCharWordcountFeatures()
         self.__setLexicalFeatures()
         self.__setBigramFeatures()
+        self.__setSyntacticFeatures()
+        self.__setOtherFeatures()
     
     def __setPunctuationFeatures(self):
         punct2count = list(".,:;()¿?¡!-\"\\@#$€*+")
@@ -50,13 +49,75 @@ class Dataset(pd.DataFrame):
         self["caps"] = [len(re.findall(r"[A-ZÁÉÍÓÚÑ]", i))for i in self["text"]]
         #TODO: Lexical density, ILFW
 
+    def __setSyntacticFeatures(self):
+        """This checks the position of the object and the subject relative to the verb or whether the subject is ommited"""
+        out = np.ndarray(shape = (0, 6))
+        for doc in self.docs:
+            order = [0] * 6 # Indexes: 0=Subject-Verb, 1=Verb-Subject, 2=No explicit subject, 3=Verb-Object, 4=Object-Verb, 5=obl-Verb
+
+            for i in range(len(doc.sentences)): 
+                current = []
+
+                for j in range(len(doc.sentences[i].words)):
+                    # For each word check if its the deprel that we are looking for. Also checks for the subject of subordinate clauses.
+                    if doc.sentences[i].words[j].deprel in ("csubj", "nsubj", "root", "obj", "obl", "obl:arg"):
+                        current.append(doc.sentences[i].words[j].deprel) # Here the consituent order is stored to check whether a verb has already appeared or not.
+                        match doc.sentences[i].words[j].deprel:
+                            case "nsubj" | "csubj":
+                                if "root" not in current:
+                                    order[0]+=1
+                                else:
+                                    order[1]+=1
+                            case "obj":
+                                if "root" not in current:
+                                    order[4]+=1
+                                else:
+                                    order[3]+=1
+                            case "obl" | "obl:arg":
+                                if "root" not in current:
+                                    order[5]+=1
+
+                    elif doc.sentences[i].words[j].deprel == "cc" or (doc.sentences[i].words[j].deprel == "punc" and "VERB" in [i.pos for i in doc.sentences[i].words[j:j+5]]): # Subordinate sentences can be a problem. Thus when a conjunction or sentence connector is found we assume that a new sentence starts. A very similar thing happens if we find a coma followed by a verb in one of the next five words. Nonetheless, this is not a perfect solution.
+                        if "nsubj" not in current and "csubj" not in current and "root" in current: # Implicit or ommited subjects
+                            order[2]+=1
+                        current = []  
+
+                if "nsubj" not in current and "csubj" not in current and "root" in current: # Implicit or ommited subjects
+                    order[2]+=1
+
+            out = np.insert(out, len(out), order, axis=0)
+
+        out = np.transpose(out)# As each nested array contains the information about one review transposing the matrix means that now every nested array contains one of the count of one oof the positions of the subject/object
+        labels = ["Subject-Verb","Verb-Subject","No explicit subject","Verb-Object","Object-Verb", "obl-Verb"]
+        for i in range(len(out)):
+            self[labels[i]] = out[i]
+
     def __setLexicalFeatures(self):
         posTags = ("NOUN", "VERB", "AUX", "ADJ", "PRON", "ADV", "CCONJ", "SCONJ", "ADP", "PROPN", "NUM")
         for i in posTags:
             self["count"+i] = [j.count(i)/len(j) for j in self.pos]
-        #TODO: Comparative and superlative adjectives, lexical complexity
+        #Comparatives ans superlatives
+        _comparatives = []
+        _superlatives = []
+        for doc in self.docs:
+            comparatives = 0
+            superlatives = 0
+            for sent in doc.sentences:
+                for i in range(len(sent.words)-1):
+                    # The comprobation is made relative to the comparative adverb, first check if it's a superlative and then, in case it's not, check comparative.
+                    if i > 0 and sent.words[i-1].text.lower() in ("el", "la", "lo", "los", "las") and sent.words[i].text.lower() in ("mas", "más", "menos") and sent.words[i+1].pos in ("ADJ", "ADV"):
+                        superlatives += 1
+                    elif sent.words[i].text.lower() in ("mas", "más") and sent.words[i+2].pos in ("ADJ", "ADV"):
+                        comparatives+=1
+            _comparatives.append(comparatives)
+            _superlatives.append(superlatives)
+        self["Comparatives"] = _comparatives
+        self["Superlatives"] = _superlatives
+        del _comparatives, _superlatives
+        #TODO: Lexical complexity
     
     def __setBigramFeatures(self):
+        # Makes POS bigram count from the POS bigram matrix attribute
         self["ADJ+VERB"] = [i["ADJ"]["VERB"] for i in self.posBigramMatrix]
         self["CONJ+VERB"] = [i["CCONJ"]["VERB"]+i["SCONJ"]["VERB"] for i in self.posBigramMatrix]
         self["CONJ+ADJ"] = [i["CCONJ"]["ADJ"]+i["SCONJ"]["ADJ"] for i in self.posBigramMatrix]
@@ -66,14 +127,14 @@ class Dataset(pd.DataFrame):
         self["NOUN+VERB"] = [i["NOUN"]["VERB"] for i in self.posBigramMatrix]
         #TODO: TF-IDF bigram
 
-    #TODO: syntactic structure Features, legibility features, pragmatic/discourse features, Other features
+    def __setOtherFeatures(self):
+        self["NERS"] = [len(doc.entities) for doc in self.docs]
+        #TODO: Lexical Diversity, grammatical errors, emotion and toxicity
+
+    #TODO: legibility features, pragmatic/discourse features
 
     def debug(self):
-        for i in self.sentences:
-            for j in i:
-                for token in self.nlp_spacy(j.text):
-                    print(token.text, token.dep_)
-                print(*[f'id: {word.id}\tword: {word.text}\thead id: {word.head}\thead: {j.words[word.head-1].text if word.head > 0 else "root"}\tdeprel: {word.deprel}' for word in j.words], sep='\n')
+        pass
 
 
 def bigramMatrix(l : list, keys: list):
@@ -86,14 +147,14 @@ def bigramMatrix(l : list, keys: list):
     :return: Returns the bigram matrix as dictionaries nested in another dictionary with the given keys as keys and the count of the bigram as values of the nested dictionaries.
     :rtype: dict[dict]
     """
-    out = initMatrixAsDict(keys)
+    out = initMatrixAsDict(keys, keys)
     for i in range(len(l)-1):
         out[l[i]][l[i+1]]+=1
     return out
 
-def initMatrixAsDict(keys):
+def initMatrixAsDict(keys_x, keys_y):
     out = {}
-    for i in itertools.product(keys, keys):
+    for i in itertools.product(keys_x, keys_y):
         if i[0] in out.keys() and out[i[0]] != None:
             out[i[0]].update({i[1]:0})
         else:
@@ -101,4 +162,4 @@ def initMatrixAsDict(keys):
     return out
 
 if __name__ == "__main__":
-    print("Hola")
+    pass

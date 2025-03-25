@@ -2,6 +2,8 @@
 
 # Changelog
 
+25/03/2025: Extended the dependency parser comparison between stanza and SpaCy there's information on the accuracy of stanza with the sentence tokenizer enabled. Extracted comparative and superlative structures for the Lexical features. Extracted the NER count for other features. Designed and extracted the syntactic features of order of constituents by checking the position of the subject and object relative to the verb or whether the subject is implicit. Added some comments for the sake of clarity and legibility.
+
 08/03/2025: Completed the evaluation the accuracy of stanza and SpaCy when parsing syntactic structures. SpaCy's sentence tokenizer cant be disabled inside the Dependency Parser, so there might be some margin of error.
 
 05/03/2025: Managed to make Freeling work and to take the output into a python object as a matrix of dictionaries (list[list[dict]]). The fist dimension constitutes the sentences, the second constitutes each word and each key of the dictionary refers to the following: ID FORM LEMMA TAG SHORT_TAG MSD NEC SENSE SYNTAX DEPHEAD DEPREL COREF SRL. Malt parser has been partially implemented but it depends on the freeling output.
