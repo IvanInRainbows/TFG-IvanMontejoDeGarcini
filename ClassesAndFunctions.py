@@ -96,7 +96,7 @@ class Dataset(pd.DataFrame):
         posTags = ("NOUN", "VERB", "AUX", "ADJ", "PRON", "ADV", "CCONJ", "SCONJ", "ADP", "PROPN", "NUM")
         for i in posTags:
             self["count"+i] = [j.count(i)/len(j) for j in self.pos]
-        #Comparatives ans superlatives
+        #Comparatives and superlatives
         _comparatives = []
         _superlatives = []
         for doc in self.docs:
