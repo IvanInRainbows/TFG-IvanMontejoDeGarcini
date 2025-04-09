@@ -2,6 +2,8 @@
 
 # Changelog
 
+09/04/2025: Finished feature extraction by adding the text readability and legibility features, grammar errors and lexical diversity. Fixed some bugs in the nSentsle11Words and nSentsge34Words features. Added the feature correlation file where correlation between each feature and the label is calculated using point biserial and mutual information coefficients.
+
 28/03/2025: Extended the dependency parser model evaluation to include more accurate metrics (precision, recall and f1 score). Given the computational processing power required the code has been adapted to Google Colab, as local runtime takes too long.
 
 25/03/2025: Extended the dependency parser comparison between stanza and SpaCy there's information on the accuracy of stanza with the sentence tokenizer enabled. Extracted comparative and superlative structures for the Lexical features. Extracted the NER count for other features. Designed and extracted the syntactic features of order of constituents by checking the position of the subject and object relative to the verb or whether the subject is implicit. Added some comments for the sake of clarity and legibility.

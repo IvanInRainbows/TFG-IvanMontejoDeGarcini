@@ -6,3 +6,4 @@ conllu-to-conll-standard.py
 corpus.conll
 freelingOutput.conll
 trash/
+tests/

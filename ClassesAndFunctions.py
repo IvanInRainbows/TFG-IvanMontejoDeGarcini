@@ -3,11 +3,14 @@ import numpy as np
 import stanza
 import re
 import itertools
-import numpy as np
 from stanza.utils.conll import CoNLL
+import textstat
+import language_tool_python as lt
+textstat.set_lang("es")
+
 
 class Dataset(pd.DataFrame):
-    nlp_stanza = stanza.Pipeline(lang='es', processors='tokenize,ner,mwt,pos,lemma,depparse')
+    nlp_stanza = stanza.Pipeline(lang='es', processors='tokenize,ner,mwt,pos,lemma,depparse', use_gpu=True)
     uposTags = ("ADJ","ADP", "ADV", "AUX", "CCONJ", "DET", "INTJ", "ADJ", "NOUN", "NUM", "PART", "PRON", "PROPN", "PUNCT", "SCONJ", "SYM", "VERB", "X")
     def __init__(self, source : pd.DataFrame):
         """Main object that generates the dataset from a pandas DataFrame object consisting of two columns. The first column should be named 'text' and contain the raw texts. The second column should be named 'label' and contain the label 'human' if the text is human generated or anything else if it's AI generated.
@@ -31,6 +34,7 @@ class Dataset(pd.DataFrame):
         self.__setBigramFeatures()
         self.__setSyntacticFeatures()
         self.__setOtherFeatures()
+        self.__readabilityComplexFeatures()
     
     def __setPunctuationFeatures(self):
         punct2count = list(".,:;()¿?¡!-\"\\@#$€*+")
@@ -44,10 +48,10 @@ class Dataset(pd.DataFrame):
         self["avgWordsPerSent"] = [self["words"][i]/self["sentences"][i] for i in range(len(self.docs))]
         self["wordCharCount"] = [len("".join(i)) for i in self.words]
         self["avgWordDensity"] = [self["wordCharCount"][i]/self["words"][i] for i in range(len(self["words"]))]
-        self["nSentsle11Words"] = [sum([1 if len(j.words) <= 11 else 0 for j in i]) for i in self.sentences]
-        self["nSentsge34Words"] = [sum([1 if len(j.words) >= 11 else 0 for j in i]) for i in self.sentences]
+        self["nSentsle11Words"] = [sum([1 if len(j.words) < 11 else 0 for j in i]) for i in self.sentences]
+        self["nSentsge34Words"] = [sum([1 if len(j.words) > 34 else 0 for j in i]) for i in self.sentences]
         self["caps"] = [len(re.findall(r"[A-ZÁÉÍÓÚÑ]", i))for i in self["text"]]
-        #TODO: Lexical density, ILFW
+        self["Lexical density"] = [len([j.text for j in self.docs[i].iter_words() if j.pos in ("ADJ", "ADV", "VERB", "NOUN")])/len(self.tokens[i]) for i in range(len(self.docs))]
 
     def __setSyntacticFeatures(self):
         """This checks the position of the object and the subject relative to the verb or whether the subject is ommited"""
@@ -107,14 +111,13 @@ class Dataset(pd.DataFrame):
                     # The comprobation is made relative to the comparative adverb, first check if it's a superlative and then, in case it's not, check comparative.
                     if i > 0 and sent.words[i-1].text.lower() in ("el", "la", "lo", "los", "las") and sent.words[i].text.lower() in ("mas", "más", "menos") and sent.words[i+1].pos in ("ADJ", "ADV"):
                         superlatives += 1
-                    elif sent.words[i].text.lower() in ("mas", "más") and sent.words[i+2].pos in ("ADJ", "ADV"):
+                    elif sent.words[i].text.lower() in ("mas", "más") and sent.words[i+1].pos in ("ADJ", "ADV"):
                         comparatives+=1
             _comparatives.append(comparatives)
             _superlatives.append(superlatives)
         self["Comparatives"] = _comparatives
         self["Superlatives"] = _superlatives
         del _comparatives, _superlatives
-        #TODO: Lexical complexity
     
     def __setBigramFeatures(self):
         # Makes POS bigram count from the POS bigram matrix attribute
@@ -125,13 +128,21 @@ class Dataset(pd.DataFrame):
         self["CONJ+ADV"] = [i["CCONJ"]["ADV"]+i["SCONJ"]["ADV"] for i in self.posBigramMatrix]
         self["PRON+VERB"] = [i["PRON"]["VERB"] for i in self.posBigramMatrix]
         self["NOUN+VERB"] = [i["NOUN"]["VERB"] for i in self.posBigramMatrix]
-        #TODO: TF-IDF bigram
 
     def __setOtherFeatures(self):
         self["NERS"] = [len(doc.entities) for doc in self.docs]
-        #TODO: Lexical Diversity, grammatical errors, emotion and toxicity
+        tool = lt.LanguageTool('es')
+        self["Grammar errors"] = [len(tool.check(t)) for t in self["text"]]
+        _tmp = [set([j.lemma for j in i.iter_words() if j.pos in ("ADJ", "ADV", "VERB", "NOUN")]) for i in self.docs]
+        self["Lexical diversity"] = [len(_tmp[i])/len(self.sentences[i]) for i in range(len(_tmp))]
+        del _tmp
 
-    #TODO: legibility features, pragmatic/discourse features
+    def __readabilityComplexFeatures(self):
+        self["G. Polini"] = [textstat.gutierrez_polini(t) for t in self["text"]]
+        self["F. Huerta readability"] = [textstat.fernandez_huerta(t) for t in self["text"]]
+        self["Crawford score"] = [textstat.crawford(t) for t in self["text"]]
+
+    #TODO: pragmatic/discourse features
 
     def debug(self):
         pass
