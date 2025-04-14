@@ -27,6 +27,7 @@ class Dataset(pd.DataFrame):
         self.lemmas = [[j.lemma for j in i.iter_words()] for i in self.docs]
         self.pos = [[j.upos for j in i.iter_words()] for i in self.docs]
         self.posBigramMatrix = [bigramMatrix(i, self.uposTags) for i in self.pos]
+        self.nChars = [len(i) for i in self["text"]]
         self["label"] = [0 if i == "human" else 1 for i in source["label"]]
         self.__setPunctuationFeatures()
         self.__setCharWordcountFeatures()
@@ -39,18 +40,19 @@ class Dataset(pd.DataFrame):
     def __setPunctuationFeatures(self):
         punct2count = list(".,:;()¿?¡!-\"\\@#$€*+")
         for i in punct2count:
-            self[i] = [j.count(i) for j in self["text"]]
+            self[i] = [self["text"][j].count(i)/len(self.tokens[j]) for j in range(len(self["text"]))]
 
     def __setCharWordcountFeatures(self):
         self["sentences"] = [len(i.sentences) for i in self.docs]
         #self["tokens"] = [i.num_tokens for i in self.docs]
         self["words"] = [i.num_words for i in self.docs]
+        self["TTR"] = np.array([len(set([j.text for j in i.iter_words()])) for i in self.docs])/self["words"]
         self["avgWordsPerSent"] = [self["words"][i]/self["sentences"][i] for i in range(len(self.docs))]
-        self["wordCharCount"] = [len("".join(i)) for i in self.words]
+        self["wordCharCount"] = [len("".join(self.words[i]))/self.nChars[i] for i in range(len(self.words))]
         self["avgWordDensity"] = [self["wordCharCount"][i]/self["words"][i] for i in range(len(self["words"]))]
-        self["nSentsle11Words"] = [sum([1 if len(j.words) < 11 else 0 for j in i]) for i in self.sentences]
-        self["nSentsge34Words"] = [sum([1 if len(j.words) > 34 else 0 for j in i]) for i in self.sentences]
-        self["caps"] = [len(re.findall(r"[A-ZÁÉÍÓÚÑ]", i))for i in self["text"]]
+        self["nSentsle11Words"] = [sum([1 if len(j.words) < 11 else 0 for j in i])/len(i) for i in self.sentences]
+        self["nSentsge34Words"] = [sum([1 if len(j.words) > 34 else 0 for j in i])/len(i) for i in self.sentences]
+        self["caps"] = [len(re.findall(r"[A-ZÁÉÍÓÚÑ]", i)) for i in self["text"]]
         self["Lexical density"] = [len([j.text for j in self.docs[i].iter_words() if j.pos in ("ADJ", "ADV", "VERB", "NOUN")])/len(self.tokens[i]) for i in range(len(self.docs))]
 
     def __setSyntacticFeatures(self):
@@ -92,9 +94,10 @@ class Dataset(pd.DataFrame):
             out = np.insert(out, len(out), order, axis=0)
 
         out = np.transpose(out)# As each nested array contains the information about one review transposing the matrix means that now every nested array contains one of the count of one oof the positions of the subject/object
+        self.nSents = np.array([len(i) for i in self.sentences])
         labels = ["Subject-Verb","Verb-Subject","No explicit subject","Verb-Object","Object-Verb", "obl-Verb"]
         for i in range(len(out)):
-            self[labels[i]] = out[i]
+            self[labels[i]] = out[i]/self.nSents
 
     def __setLexicalFeatures(self):
         posTags = ("NOUN", "VERB", "AUX", "ADJ", "PRON", "ADV", "CCONJ", "SCONJ", "ADP", "PROPN", "NUM")
@@ -115,8 +118,8 @@ class Dataset(pd.DataFrame):
                         comparatives+=1
             _comparatives.append(comparatives)
             _superlatives.append(superlatives)
-        self["Comparatives"] = _comparatives
-        self["Superlatives"] = _superlatives
+        self["Comparatives"] = np.array(_comparatives)/self["words"]
+        self["Superlatives"] = np.array(_superlatives)/self["words"]
         del _comparatives, _superlatives
     
     def __setBigramFeatures(self):
@@ -128,11 +131,20 @@ class Dataset(pd.DataFrame):
         self["CONJ+ADV"] = [i["CCONJ"]["ADV"]+i["SCONJ"]["ADV"] for i in self.posBigramMatrix]
         self["PRON+VERB"] = [i["PRON"]["VERB"] for i in self.posBigramMatrix]
         self["NOUN+VERB"] = [i["NOUN"]["VERB"] for i in self.posBigramMatrix]
+        # NORMALIZATION
+        self["ADJ+VERB"]/=self["words"]
+        self["CONJ+VERB"]/=self["words"]
+        self["CONJ+ADJ"]/=self["words"]
+        self["CONJ+NOUN"]/=self["words"]
+        self["CONJ+ADV"]/=self["words"]
+        self["PRON+VERB"]/=self["words"]
+        self["NOUN+VERB"]/=self["words"]
 
     def __setOtherFeatures(self):
-        self["NERS"] = [len(doc.entities) for doc in self.docs]
+        self["NERS"] = [len(doc.entities)/doc.num_words for doc in self.docs]
         tool = lt.LanguageTool('es')
         self["Grammar errors"] = [len(tool.check(t)) for t in self["text"]]
+        self["Grammar errors"] /= self["words"]
         _tmp = [set([j.lemma for j in i.iter_words() if j.pos in ("ADJ", "ADV", "VERB", "NOUN")]) for i in self.docs]
         self["Lexical diversity"] = [len(_tmp[i])/len(self.sentences[i]) for i in range(len(_tmp))]
         del _tmp

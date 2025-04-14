@@ -2,6 +2,8 @@
 
 # Changelog
 
+14/04/2025: Normalized most features (punctuation, wordCharCount, nSentsle11Words, nSentsge34Words, all syntactic features, Superlatives, Comparatives, all Bigram features, NERS and Grammar errors). Added TTR feature. Re-executed feature correlation to fit the changes made. Finished the model evaluation and subsequent classifier by optimizing the features to minimize model noise. As the train and test data are sampled randomly the best model may vary depending on the data. The sample taken has alfo been stratified so the quantity of each label is balanced between the test and train data. Exported the best model to a pickle file.
+
 09/04/2025: Finished feature extraction by adding the text readability and legibility features, grammar errors and lexical diversity. Fixed some bugs in the nSentsle11Words and nSentsge34Words features. Added the feature correlation file where correlation between each feature and the label is calculated using point biserial and mutual information coefficients.
 
 28/03/2025: Extended the dependency parser model evaluation to include more accurate metrics (precision, recall and f1 score). Given the computational processing power required the code has been adapted to Google Colab, as local runtime takes too long.
