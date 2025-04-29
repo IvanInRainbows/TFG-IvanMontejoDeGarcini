@@ -31,6 +31,10 @@ class Dataset(pd.DataFrame):
         self["label"] = [0 if i == "human" else 1 for i in source["label"]]
         self.__setPunctuationFeatures()
         self.__setCharWordcountFeatures()
+        self.avgWordsPerSentComparison = {
+            'human': np.mean([self["avgWordsPerSent"][i] for i in range(len(self["label"])) if self["label"][i] == 0]),
+            'gpt': np.mean([self["avgWordsPerSent"][i] for i in range(len(self["label"])) if self["label"][i] == 1])
+        }
         self.__setLexicalFeatures()
         self.__setBigramFeatures()
         self.__setSyntacticFeatures()
@@ -50,10 +54,13 @@ class Dataset(pd.DataFrame):
         self["avgWordsPerSent"] = [self["words"][i]/self["sentences"][i] for i in range(len(self.docs))]
         self["wordCharCount"] = [len("".join(self.words[i]))/self.nChars[i] for i in range(len(self.words))]
         self["avgWordDensity"] = [self["wordCharCount"][i]/self["words"][i] for i in range(len(self["words"]))]
-        self["nSentsle11Words"] = [sum([1 if len(j.words) < 11 else 0 for j in i])/len(i) for i in self.sentences]
-        self["nSentsge34Words"] = [sum([1 if len(j.words) > 34 else 0 for j in i])/len(i) for i in self.sentences]
-        self["caps"] = [len(re.findall(r"[A-ZÁÉÍÓÚÑ]", i)) for i in self["text"]]
-        self["Lexical density"] = [len([j.text for j in self.docs[i].iter_words() if j.pos in ("ADJ", "ADV", "VERB", "NOUN")])/len(self.tokens[i]) for i in range(len(self.docs))]
+        self["nSentsl16Words"] = [sum([1 if len(j.words) <= 15 else 0 for j in i])/len(i) for i in self.sentences]
+        self["nSentsg26Words"] = [sum([1 if len(j.words) >= 25 else 0 for j in i])/len(i) for i in self.sentences]
+        #self["caps"] = [len(re.findall(r"[A-ZÁÉÍÓÚÑ]", i)) for i in self["text"]] # This feature proved not to be relevant for the corpus
+        self["Lexical density"] = [len([j.text for j in self.docs[i].iter_words() if j.pos in ("ADJ", "ADV", "VERB", "NOUN")])/len(self.words[i]) for i in range(len(self.docs))]
+        _tmp = [set([j.lemma for j in i.iter_words() if j.pos in ("ADJ", "ADV", "VERB", "NOUN")]) for i in self.docs]
+        self["Lexical diversity"] = [len(_tmp[i])/len(self.sentences[i]) for i in range(len(_tmp))]
+        del _tmp
 
     def __setSyntacticFeatures(self):
         """This checks the position of the object and the subject relative to the verb or whether the subject is ommited"""
@@ -114,7 +121,7 @@ class Dataset(pd.DataFrame):
                     # The comprobation is made relative to the comparative adverb, first check if it's a superlative and then, in case it's not, check comparative.
                     if i > 0 and sent.words[i-1].text.lower() in ("el", "la", "lo", "los", "las") and sent.words[i].text.lower() in ("mas", "más", "menos") and sent.words[i+1].pos in ("ADJ", "ADV"):
                         superlatives += 1
-                    elif sent.words[i].text.lower() in ("mas", "más") and sent.words[i+1].pos in ("ADJ", "ADV"):
+                    elif sent.words[i].text.lower() in ("mas", "más", "menos") and sent.words[i+1].pos in ("ADJ", "ADV"):
                         comparatives+=1
             _comparatives.append(comparatives)
             _superlatives.append(superlatives)
@@ -145,19 +152,15 @@ class Dataset(pd.DataFrame):
         tool = lt.LanguageTool('es')
         self["Grammar errors"] = [len(tool.check(t)) for t in self["text"]]
         self["Grammar errors"] /= self["words"]
-        _tmp = [set([j.lemma for j in i.iter_words() if j.pos in ("ADJ", "ADV", "VERB", "NOUN")]) for i in self.docs]
-        self["Lexical diversity"] = [len(_tmp[i])/len(self.sentences[i]) for i in range(len(_tmp))]
-        del _tmp
 
     def __readabilityComplexFeatures(self):
         self["G. Polini"] = [textstat.gutierrez_polini(t) for t in self["text"]]
         self["F. Huerta readability"] = [textstat.fernandez_huerta(t) for t in self["text"]]
         self["Crawford score"] = [textstat.crawford(t) for t in self["text"]]
 
-    #TODO: pragmatic/discourse features
-
-    def debug(self):
-        pass
+    def show_wordspersent(self):
+        print(f"Average words per sentence in human texts: {self.avgWordsPerSentComparison['human']}")
+        print(f"Average words per sentence in human texts: {self.avgWordsPerSentComparison['gpt']}")
 
 
 def bigramMatrix(l : list, keys: list):
