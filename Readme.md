@@ -6,6 +6,8 @@ The subject of this thesis is motivated by the fact that AI-generated text and l
 
 # Changelog
 
+29/04/2025: Made some changes to the features (nSentsl16Words and nSentsg26Words, deleted caps feature and fixed some small bugs). Also calculated the average number of words per sentence in each label, thus the feature changes. Deleted the excel files, as they became obsolete with recent changes.
+
 17/04/2025: Now the classifier has been finished (at least for now), new tests have been made regarding the accuracy of the feature order and algorithms. For that purpose two excel files have been created each containing the information on the accuracy of the algorithms and feature use. One of this files has been tested using the mutual info coefficient order for the features and the other one using point biserial. Finally added a description to the repo.
 
 14/04/2025: Normalized most features (punctuation, wordCharCount, nSentsle11Words, nSentsge34Words, all syntactic features, Superlatives, Comparatives, all Bigram features, NERS and Grammar errors). Added TTR feature. Re-executed feature correlation to fit the changes made. Finished the model evaluation and subsequent classifier by optimizing the features to minimize model noise. As the train and test data are sampled randomly the best model may vary depending on the data. The sample taken has alfo been stratified so the quantity of each label is balanced between the test and train data. Exported the best model to a pickle file.
