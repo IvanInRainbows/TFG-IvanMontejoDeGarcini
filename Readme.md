@@ -6,6 +6,8 @@ The subject of this thesis is motivated by the fact that AI-generated text and l
 
 # Changelog
 
+20/05/2025: Removed some Google Colab widgets so the notebooks can be rendered in GitHub.
+
 29/04/2025: Made some changes to the features (nSentsl16Words and nSentsg26Words, deleted caps feature and fixed some small bugs). Also calculated the average number of words per sentence in each label, thus the feature changes. Deleted the excel files, as they became obsolete with recent changes.
 
 17/04/2025: Now the classifier has been finished (at least for now), new tests have been made regarding the accuracy of the feature order and algorithms. For that purpose two excel files have been created each containing the information on the accuracy of the algorithms and feature use. One of this files has been tested using the mutual info coefficient order for the features and the other one using point biserial. Finally added a description to the repo.
