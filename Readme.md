@@ -6,6 +6,8 @@ The subject of this thesis is motivated by the fact that AI-generated text and l
 
 # Changelog
 
+23/05/2025: Included the excel files with the correlation coefficients and the evaluation metrics.
+
 20/05/2025: Removed some Google Colab widgets so the notebooks can be rendered in GitHub.
 
 29/04/2025: Made some changes to the features (nSentsl16Words and nSentsg26Words, deleted caps feature and fixed some small bugs). Also calculated the average number of words per sentence in each label, thus the feature changes. Deleted the excel files, as they became obsolete with recent changes.
